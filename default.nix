@@ -1,9 +1,16 @@
-{ pkgs_ ? <nixpkgs>, compiler ? "ghc865", isJS ? true }:
+{ chan ? "e1843646b04fb564abf6330a9432a76df3269d2f"
+, compiler ? "ghc864"
+, isJS ? false }:
 let
-  shpadoinkle = (import pkgs_ {}).fetchgit {
+
+  pkgs_ = builtins.fetchTarball {
+    url = "https://github.com/NixOS/nixpkgs/archive/${chan}.tar.gz";
+  };
+
+  shpadoinkle = builtins.fetchGit {
     url    = https://gitlab.com/fresheyeball/Shpadoinkle.git;
-    rev    = "243b89a00c29cdce6768be1b743e846a0bc22fea";
-    sha256 = "06v4mgni4nq7asxy96761hgrdzhlva36vzak0l4yxc727zfwrffr";
+    rev    = "92f0e10a93882d193c390df7292685c8e02f8ed3";
+    ref    = "docs";
   };
 
   shpadoinkle-overlay =
@@ -12,9 +19,18 @@ let
   reflex-overlay =
     import (shpadoinkle + "/overlay-reflex.nix") { inherit compiler isJS; };
 
-  haskell-overlay = hself: hsuper: import shpadoinkle { inherit compiler isJS; };
+  haskell-overlay = hself: hsuper:
+   { Shpadoinkle                  = hself.callCabal2nix "Shpadoinkle"                  (shpadoinkle + "/core")              {};
+     Shpadoinkle-backend-snabbdom = hself.callCabal2nix "Shpadoinkle-backend-snabbdom" (shpadoinkle + "/backends/snabbdom") {};
+     Shpadoinkle-backend-static   = hself.callCabal2nix "Shpadoinkle-backend-static"   (shpadoinkle + "/backends/static")   {};
+     Shpadoinkle-backend-pardiff  = hself.callCabal2nix "Shpadoinkle-backend-pardiff"  (shpadoinkle + "/backends/pardiff")  {};
+     Shpadoinkle-lens             = hself.callCabal2nix "Shpadoinkle-lens"             (shpadoinkle + "/lens")              {};
+     Shpadoinkle-html             = hself.callCabal2nix "Shpadoinkle-html"             (shpadoinkle + "/html")              {};
+     Shpadoinkle-router           = hself.callCabal2nix "Shpadoinkle-router"           (shpadoinkle + "/router")            {};
+     Shpadoinkle-widgets          = hself.callCabal2nix "Shpadoinkle-widgets"          (shpadoinkle + "/widgets")           {};
+   };
 
-  my-overlay = self: super: {
+  snowman-overlay = self: super: {
     haskell = super.haskell //
       { packages = super.haskell.packages //
         { ${compiler} = super.haskell.packages.${compiler}.override (old: {
@@ -26,9 +42,13 @@ let
     };
 
   pkgs = import pkgs_ {
-    overlays = [ shpadoinkle-overlay reflex-overlay my-overlay ];
+    overlays = [
+      shpadoinkle-overlay
+      reflex-overlay
+      snowman-overlay
+    ];
   };
 
 in
-  pkgs.haskell.packages.${compiler}.callCabal2nix "my-ui" ./. {}
+  pkgs.haskell.packages.${compiler}.callCabal2nix "snowman" ./. {}
 
