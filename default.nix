@@ -1,5 +1,11 @@
 { chan ? "e1843646b04fb564abf6330a9432a76df3269d2f"
 , compiler ? "ghc864"
+, withHoogle ? false
+, doHoogle ? false
+, doHaddock ? false
+, enableLibraryProfiling ? false
+, enableExecutableProfiling ? false
+, strictDeps ? false
 , isJS ? false }:
 let
 
@@ -7,7 +13,7 @@ let
     url = "https://github.com/NixOS/nixpkgs/archive/${chan}.tar.gz";
   };
 
-  shpadoinkle = builtins.fetchGit {
+  shpadoinkle = if true then ../Shpadoinkle else builtins.fetchGit {
     url    = https://gitlab.com/fresheyeball/Shpadoinkle.git;
     rev    = "92f0e10a93882d193c390df7292685c8e02f8ed3";
     ref    = "docs";
@@ -20,6 +26,12 @@ let
 
   reflex-overlay =
     import (shpadoinkle + "/overlay-reflex.nix") { inherit compiler isJS; };
+
+  chill = p: (pkgs.haskell.lib.overrideCabal p {
+    inherit enableLibraryProfiling enableExecutableProfiling;
+  }).overrideAttrs (_: {
+    inherit doHoogle doHaddock strictDeps;
+  });
 
   haskell-overlay = hself: hsuper:
    { Shpadoinkle                  = hself.callCabal2nix "Shpadoinkle"                  (shpadoinkle + "/core")              {};
@@ -36,14 +48,16 @@ let
     haskell = super.haskell //
       { packages = super.haskell.packages //
         { ${compilerjs} = super.haskell.packages.${compilerjs}.override (old: {
-            overrides = super.lib.composeExtensions
-              (old.overrides or (_: _: {})) haskell-overlay;
+            overrides = super.lib.composeExtensions (old.overrides or (_: _: {})) haskell-overlay;
           });
         };
       };
     };
 
-  pkgs = import pkgs_ {
+  pkgs = import
+    (builtins.fetchTarball {
+      url = "https://github.com/NixOS/nixpkgs/archive/${chan}.tar.gz";
+    }) {
     overlays = [
       shpadoinkle-overlay
       reflex-overlay
@@ -51,6 +65,17 @@ let
     ];
   };
 
-in
-  pkgs.haskell.packages.${compilerjs}.callCabal2nix "snowman" ./. {}
+  snowman = pkgs.haskell.packages.${compilerjs}.callCabal2nix "snowman" ./. {};
 
+in with pkgs; with lib; with haskell.packages.${compiler};
+
+  if inNixShell
+  then shellFor {
+    inherit withHoogle;
+    packages = _: [snowman];
+    COMPILER = compilerjs;
+    buildInputs = [ stylish-haskell cabal-install ghcid ];
+    shellHook = ''
+      echo "☃️  -> 🥔 ☃️"
+    '';
+  } else chill snowman
