@@ -6,12 +6,10 @@
 , enableLibraryProfiling ? false
 , enableExecutableProfiling ? false
 , strictDeps ? false
-, isJS ? false }:
+, isJS ? false
+, asShell ? false
+}:
 let
-
-  pkgs_ = builtins.fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/${chan}.tar.gz";
-  };
 
   shpadoinkle = if true then ../Shpadoinkle else builtins.fetchGit {
     url    = https://gitlab.com/fresheyeball/Shpadoinkle.git;
@@ -21,17 +19,17 @@ let
 
   compilerjs = (import (shpadoinkle + "/util.nix") { inherit compiler isJS; }).compilerjs;
 
-  shpadoinkle-overlay =
-    import (shpadoinkle + "/overlay.nix") { inherit compiler isJS; };
-
-  reflex-overlay =
-    import (shpadoinkle + "/overlay-reflex.nix") { inherit compiler isJS; };
-
   chill = p: (pkgs.haskell.lib.overrideCabal p {
     inherit enableLibraryProfiling enableExecutableProfiling;
   }).overrideAttrs (_: {
     inherit doHoogle doHaddock strictDeps;
   });
+
+  shpadoinkle-overlay =
+    import (shpadoinkle + "/overlay.nix") { inherit compiler isJS; };
+
+  reflex-overlay =
+    import (shpadoinkle + "/overlay-reflex.nix") { inherit compiler isJS; };
 
   haskell-overlay = hself: hsuper:
    { Shpadoinkle                  = hself.callCabal2nix "Shpadoinkle"                  (shpadoinkle + "/core")              {};
@@ -69,13 +67,13 @@ let
 
 in with pkgs; with lib; with haskell.packages.${compiler};
 
-  if inNixShell
+  if inNixShell || asShell
   then shellFor {
     inherit withHoogle;
     packages = _: [snowman];
     COMPILER = compilerjs;
-    buildInputs = [ stylish-haskell cabal-install ghcid ];
+    buildInputs = [ stylish-haskell cabal-install ghcid lolcat ];
     shellHook = ''
-      echo "☃️  -> 🥔 ☃️"
+      lolcat ${./figlet}
     '';
   } else chill snowman
