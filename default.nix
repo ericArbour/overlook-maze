@@ -13,6 +13,8 @@ let
     ref    = "docs";
   };
 
+  compilerjs = (import (shpadoinkle + "/util.nix") { inherit compiler isJS; }).compilerjs;
+
   shpadoinkle-overlay =
     import (shpadoinkle + "/overlay.nix") { inherit compiler isJS; };
 
@@ -33,7 +35,7 @@ let
   snowman-overlay = self: super: {
     haskell = super.haskell //
       { packages = super.haskell.packages //
-        { ${compiler} = super.haskell.packages.${compiler}.override (old: {
+        { ${compilerjs} = super.haskell.packages.${compilerjs}.override (old: {
             overrides = super.lib.composeExtensions
               (old.overrides or (_: _: {})) haskell-overlay;
           });
@@ -50,5 +52,5 @@ let
   };
 
 in
-  pkgs.haskell.packages.${compiler}.callCabal2nix "snowman" ./. {}
+  pkgs.haskell.packages.${compilerjs}.callCabal2nix "snowman" ./. {}
 
