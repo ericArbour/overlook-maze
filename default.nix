@@ -11,9 +11,9 @@
 }:
 let
 
-  shpadoinkle = if true then ../Shpadoinkle else builtins.fetchGit {
+  shpadoinkle = builtins.fetchGit {
     url    = https://gitlab.com/fresheyeball/Shpadoinkle.git;
-    rev    = "92f0e10a93882d193c390df7292685c8e02f8ed3";
+    rev    = "72715989495c80dfdf0b5b1894ee2878ff19e7a8";
     ref    = "docs";
   };
 
