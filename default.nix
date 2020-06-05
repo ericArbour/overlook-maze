@@ -24,7 +24,6 @@ let
   ignorance = [
     "*.md"
     "figlet"
-    "LICENSE"
     "*.nix"
     "*.sh"
     "*.yml"
