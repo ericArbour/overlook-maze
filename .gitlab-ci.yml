@@ -15,13 +15,3 @@ shell-864-ghc:
   - nix-shell --command "echo works" --fallback
   artifacts:
     untracked: true
-
-cachix:
-  stage: build
-  script:
-  - nix-env -iA cachix -f https://cachix.org/api/v1/install
-  - cachix authtoken $AUTHTOKEN
-  - ./cachix.sh
-  - rm result*
-  only:
-  - master
