@@ -2,11 +2,11 @@
 
 ☃️  ⟶ 🥔 ☃️
 
-[![Status](https://gitlab.com/fresheyeball/Shpadoinkle-snowman/badges/master/pipeline.svg)](https://gitlab.com/fresheyeball/Shpadoinkle-snowman/-/pipelines)
-
 ### We can make him tall. Or we can make him not so tall...
 
 [Snowman](https://youtu.be/JQ1ZOFNBL68?t=8) is a seed project for [Shpadoinkle](https://gitlab.com/fresheyeball/Shpadoinkle/-/tree/master/#shpadoinkle).
+
+[![Status](https://gitlab.com/fresheyeball/Shpadoinkle-snowman/badges/master/pipeline.svg)](https://gitlab.com/fresheyeball/Shpadoinkle-snowman/-/pipelines)
 
 ## Nix
 
