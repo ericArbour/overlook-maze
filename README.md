@@ -36,11 +36,13 @@ cachix use shpadoinkle
 
 ## Build the project
 
-```haskell
+The included `default.nix` file has some arguments to customize your build. To build with GHC
+
+```bash
 nix-build
 ```
 
-The included `default.nix` file has some arguements to customize your build. Importantly, if you want to build with GHC or GHCjs, (GHC is the default).
+To build with GHCjs
 
 ```bash
 nix-build --arg isJS true
