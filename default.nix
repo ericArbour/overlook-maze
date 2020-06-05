@@ -13,11 +13,11 @@ let
 
   shpadoinkle = builtins.fetchGit {
     url    = https://gitlab.com/fresheyeball/Shpadoinkle.git;
-    rev    = "72715989495c80dfdf0b5b1894ee2878ff19e7a8";
-    ref    = "docs";
+    rev    = "eb7b860e202d1d148068bdbfe063f55afe86a9bf";
+    ref    = "master";
   };
 
-  compilerjs = (import (shpadoinkle + "/util.nix") { inherit compiler isJS; }).compilerjs;
+  compilerjs = (import (shpadoinkle + "/nix/util.nix") { inherit compiler isJS; }).compilerjs;
 
   chill = p: (pkgs.haskell.lib.overrideCabal p {
     inherit enableLibraryProfiling enableExecutableProfiling;
@@ -26,22 +26,12 @@ let
   });
 
   shpadoinkle-overlay =
-    import (shpadoinkle + "/overlay.nix") { inherit compiler isJS; };
+    import (shpadoinkle + "/nix/overlay.nix") { inherit compiler isJS; };
 
-  reflex-overlay =
-    import (shpadoinkle + "/overlay-reflex.nix") { inherit compiler isJS; };
+  # Haskell specific overlay
+  haskell-overlay = hself: hsuper: { };
 
-  haskell-overlay = hself: hsuper:
-   { Shpadoinkle                  = hself.callCabal2nix "Shpadoinkle"                  (shpadoinkle + "/core")              {};
-     Shpadoinkle-backend-snabbdom = hself.callCabal2nix "Shpadoinkle-backend-snabbdom" (shpadoinkle + "/backends/snabbdom") {};
-     Shpadoinkle-backend-static   = hself.callCabal2nix "Shpadoinkle-backend-static"   (shpadoinkle + "/backends/static")   {};
-     Shpadoinkle-backend-pardiff  = hself.callCabal2nix "Shpadoinkle-backend-pardiff"  (shpadoinkle + "/backends/pardiff")  {};
-     Shpadoinkle-lens             = hself.callCabal2nix "Shpadoinkle-lens"             (shpadoinkle + "/lens")              {};
-     Shpadoinkle-html             = hself.callCabal2nix "Shpadoinkle-html"             (shpadoinkle + "/html")              {};
-     Shpadoinkle-router           = hself.callCabal2nix "Shpadoinkle-router"           (shpadoinkle + "/router")            {};
-     Shpadoinkle-widgets          = hself.callCabal2nix "Shpadoinkle-widgets"          (shpadoinkle + "/widgets")           {};
-   };
-
+  # Top level overlay
   snowman-overlay = self: super: {
     haskell = super.haskell //
       { packages = super.haskell.packages //
@@ -58,7 +48,6 @@ let
     }) {
     overlays = [
       shpadoinkle-overlay
-      reflex-overlay
       snowman-overlay
     ];
   };
@@ -72,8 +61,8 @@ in with pkgs; with lib; with haskell.packages.${compiler};
     inherit withHoogle;
     packages = _: [snowman];
     COMPILER = compilerjs;
-    buildInputs = [ stylish-haskell cabal-install ghcid lolcat ];
+    buildInputs = [ stylish-haskell cabal-install ghcid ];
     shellHook = ''
-      lolcat ${./figlet}
+      ${lolcat}/bin/lolcat ${./figlet}
     '';
   } else chill snowman
