@@ -11,27 +11,49 @@
 }:
 let
 
+
+  # It's a shpadoinkle day
   shpadoinkle = builtins.fetchGit {
     url    = https://gitlab.com/fresheyeball/Shpadoinkle.git;
     rev    = "eb7b860e202d1d148068bdbfe063f55afe86a9bf";
     ref    = "master";
   };
 
-  compilerjs = (import (shpadoinkle + "/nix/util.nix") { inherit compiler isJS; }).compilerjs;
 
+  # Additional ignore patterns to keep the Nix src clean
+  ignorance = [
+    "*.md"
+    "figlet"
+    "LICENSE"
+    "*.nix"
+    "*.sh"
+    "*.yml"
+  ];
+
+
+  # Get some utilities
+  inherit (import (shpadoinkle + "/nix/util.nix") { inherit compiler isJS; }) compilerjs gitignore;
+
+
+  # Build faster by doing less
   chill = p: (pkgs.haskell.lib.overrideCabal p {
     inherit enableLibraryProfiling enableExecutableProfiling;
   }).overrideAttrs (_: {
     inherit doHoogle doHaddock strictDeps;
   });
 
+
+  # Overlay containing Shpadoinkle packages, and needed alterations for those packages
+  # as well as optimizations from Reflex Platform
   shpadoinkle-overlay =
     import (shpadoinkle + "/nix/overlay.nix") { inherit compiler isJS; };
 
-  # Haskell specific overlay
+
+  # Haskell specific overlay (for you to extend)
   haskell-overlay = hself: hsuper: { };
 
-  # Top level overlay
+
+  # Top level overlay (for you to extend)
   snowman-overlay = self: super: {
     haskell = super.haskell //
       { packages = super.haskell.packages //
@@ -42,6 +64,8 @@ let
       };
     };
 
+
+  # Complete package set with overlays applied
   pkgs = import
     (builtins.fetchTarball {
       url = "https://github.com/NixOS/nixpkgs/archive/${chan}.tar.gz";
@@ -52,7 +76,10 @@ let
     ];
   };
 
-  snowman = pkgs.haskell.packages.${compilerjs}.callCabal2nix "snowman" ./. {};
+
+  # We can name him George
+  snowman = pkgs.haskell.packages.${compilerjs}.callCabal2nix "snowman" (gitignore ignorance ./.) {};
+
 
 in with pkgs; with lib; with haskell.packages.${compiler};
 

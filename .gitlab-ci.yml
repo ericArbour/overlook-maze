@@ -1,0 +1,27 @@
+stages:
+  - build
+
+build:
+  stage: build
+  script:
+  - nix-build --fallback
+  - rm result*
+  artifacts:
+    untracked: true
+
+shell-864-ghc:
+  stage: build
+  script:
+  - nix-shell --command "echo works" --fallback
+  artifacts:
+    untracked: true
+
+cachix:
+  stage: build
+  script:
+  - nix-env -iA cachix -f https://cachix.org/api/v1/install
+  - cachix authtoken $AUTHTOKEN
+  - ./cachix.sh
+  - rm result*
+  only:
+  - master
