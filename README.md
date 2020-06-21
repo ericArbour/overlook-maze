@@ -74,3 +74,10 @@ Get a hoogle server in one line
 ```bash
 nix-shell --arg withHoogle true --command "hoogle serve"
 ```
+
+### License
+
+[![CC0](https://licensebuttons.net/p/zero/1.0/80x15.png)](http://creativecommons.org/publicdomain/zero/1.0/)
+
+Isaac Shapira has waived all copyright and related or neighboring rights to Shpadoinkle Snowman.
+This work is published from: United States
