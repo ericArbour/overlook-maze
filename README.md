@@ -50,9 +50,6 @@ To build with GHCjs
 nix-build --arg isJS true
 ```
 
-To obtain a JavaScript build
-
-
 ## Develop
 
 ```
