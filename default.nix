@@ -15,7 +15,7 @@ let
   # It's a shpadoinkle day
   shpadoinkle = builtins.fetchGit {
     url    = https://gitlab.com/fresheyeball/Shpadoinkle.git;
-    rev    = "5e0d0d2fcdd2e7d35a1808a113f29bc74b63d356";
+    rev    = "0b7d9fa744fc6a9be4a1ff1fc834c39ff9eae1f2";
     ref    = "master";
   };
 
