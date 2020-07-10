@@ -49,7 +49,9 @@ let
 
 
   # Haskell specific overlay (for you to extend)
-  haskell-overlay = hself: hsuper: { };
+  haskell-overlay = hself: hsuper: { 
+    "happy" = pkgs.haskell.lib.dontCheck hsuper.happy;
+  };
 
 
   # Top level overlay (for you to extend)
