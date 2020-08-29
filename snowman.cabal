@@ -21,6 +21,7 @@ executable snowman
   -- other-extensions:
   build-depends:       base ^>=4.12.0.0
    , containers
+   , random
    , Shpadoinkle
    , Shpadoinkle-backend-pardiff
    , Shpadoinkle-html

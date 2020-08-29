@@ -9,6 +9,7 @@ import           Shpadoinkle.Backend.ParDiff
 -- Note: I was unable to import "main" and "main_" from Shpadoinkle.Html
 -- but I could import "main'" and "main'_"
 import           Shpadoinkle.Html            (div_, getBody, h1_, table, td, tr)
+import           System.Random               (randomRIO)
 
 import qualified Data.Map.Strict             as M
 import qualified Data.Set                    as S
@@ -20,6 +21,8 @@ type Cell = (Int, Int)
 data Edge = Edge Cell Cell deriving (Eq, Ord, Show)
 
 data EdgeState = Open | Wall deriving (Eq, Show)
+
+type EdgeStateMap = M.Map Edge EdgeState
 
 topNeighbor :: Cell -> Cell
 topNeighbor (r, c) = (r - 1, c)
@@ -49,7 +52,7 @@ rows :: [Int]
 rows = [0..10]
 
 cols :: [Int]
-cols = [0..5]
+cols = [0..6]
 
 cells :: [Cell]
 cells = do
@@ -60,23 +63,58 @@ cells = do
 cellSet :: S.Set Cell
 cellSet = S.fromList cells
 
-maybeEdge :: (Cell -> Cell) -> (Cell -> Edge) -> Cell -> Maybe Edge
-maybeEdge neighborF edgeF cell =
-  if S.member (neighborF cell) cellSet
-     then Just (edgeF cell)
-     else Nothing     
+isCellValid :: Cell -> Bool
+isCellValid cell = S.member cell cellSet
 
-edgeStateMap :: M.Map Edge EdgeState
-edgeStateMap = M.fromList . map (flip (,) $ Wall) $ edges
-  where edges = catMaybes $
-          [ maybeEdge topNeighbor topEdge
-          , maybeEdge rightNeighbor rightEdge
-          , maybeEdge bottomNeighbor bottomEdge
-          , maybeEdge leftNeighbor leftEdge
+isEdgeValid :: Edge -> Bool
+isEdgeValid (Edge cell1 cell2) = isCellValid cell1 && isCellValid cell2
+
+initialEdgeStateMap :: EdgeStateMap
+initialEdgeStateMap = M.fromList . map (flip (,) $ Wall) $ edges
+  where edges = filter isEdgeValid $
+          [ topEdge
+          , rightEdge
+          , bottomEdge
+          , leftEdge
           ] <*> cells
 
 edgeState :: Edge -> EdgeState
-edgeState edge = fromMaybe Wall . M.lookup edge $ edgeStateMap
+edgeState edge = fromMaybe Wall . M.lookup edge $ initialEdgeStateMap
+
+getNeighbors :: Cell -> [Cell]
+getNeighbors cell = filter isCellValid $
+  [ topNeighbor
+  , rightNeighbor
+  , bottomNeighbor
+  , leftNeighbor
+  ] <*> pure cell
+
+{-
+
+[ n1, n2, n3 ]
+
+n2
+
+
+
+-}
+
+generateMaze :: IO EdgeStateMap
+generateMaze = go initialEdgeStateMap S.empty (head cells)
+  where go :: EdgeStateMap -> S.Set Cell -> Cell -> IO EdgeStateMap
+        go edgeStateMap visited cell = do
+          let visited' = S.insert cell visited
+              neighbors = getNeighbors cell
+              unvisited = filter (isUnvisited visited') neighbors
+          neighbor <- getRandomNeighbor unvisited
+          return edgeStateMap
+        isUnvisited :: S.Set Cell -> Cell -> Bool
+        isUnvisited visited neighbor = not . S.member neighbor $ visited
+        getRandomNeighbor unvisited = do
+          i <- randomRIO (0, length unvisited - 1)
+          return $ unvisited !! i
+
+
 
 data AppState = AppState { greeting :: String } deriving (Eq, Show)
 
@@ -88,7 +126,7 @@ style :: Text -> (Text, Prop m)
 style t = ("style", PText t)
 
 borderColors :: Cell -> Text
-borderColors cell = foldr1 (<>) $ 
+borderColors cell = foldr1 (<>) $
   [ borderProp "top" . edgeState . topEdge
   , borderProp "right" . edgeState . rightEdge
   , borderProp "bottom" . edgeState . bottomEdge
