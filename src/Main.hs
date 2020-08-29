@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-
 module Main where
 
+import           Data.Maybe                  (catMaybes, fromMaybe)
 import           Data.Text                   (Text, pack)
 import           Shpadoinkle
 import           Shpadoinkle.Backend.ParDiff
@@ -10,38 +10,40 @@ import           Shpadoinkle.Backend.ParDiff
 -- but I could import "main'" and "main'_"
 import           Shpadoinkle.Html            (div_, getBody, h1_, table, td, tr)
 
-import qualified Data.Map                    as M
+import qualified Data.Map.Strict             as M
 import qualified Data.Set                    as S
 
 type Cell = (Int, Int)
 
-type Cells = S.Set Cell
+              -- Top  Bottom
+              -- Left Right
+data Edge = Edge Cell Cell deriving (Eq, Ord, Show)
 
 data EdgeState = Open | Wall deriving (Eq, Show)
 
-data Edge
-  = HEdge Cell Cell
-  | VEdge Cell Cell
-  deriving (Eq, Show)
+topNeighbor :: Cell -> Cell
+topNeighbor (r, c) = (r - 1, c)
 
-type EdgeMap = M.Map Edge EdgeState
+rightNeighbor :: Cell -> Cell
+rightNeighbor (r, c) = (r, c + 1)
 
-top :: Cell -> Cell
-top (r, c) = (r - 1, c)
+bottomNeighbor :: Cell -> Cell
+bottomNeighbor (r, c) = (r + 1, c)
 
-right :: Cell -> Cell
-right (r, c) = (r, c + 1)
+leftNeighbor :: Cell -> Cell
+leftNeighbor (r, c) = (r, c - 1)
 
-bottom :: Cell -> Cell
-bottom (r, c) = (r + 1, c)
+topEdge :: Cell -> Edge
+topEdge cell = Edge (topNeighbor cell) cell
 
-left :: Cell -> Cell
-left (r, c) = (r, c - 1)
+rightEdge :: Cell -> Edge
+rightEdge cell = Edge cell (rightNeighbor cell)
 
-getNeighbor :: Cell -> Cells -> (Cell -> Cell) -> Maybe Cell
-getNeighbor cell cells f = if hasNeighbor then Just neighbor else Nothing
-  where neighbor = f cell
-        hasNeighbor = S.member neighbor cells
+bottomEdge :: Cell -> Edge
+bottomEdge cell = Edge cell (bottomNeighbor cell)
+
+leftEdge :: Cell -> Edge
+leftEdge cell = Edge (leftNeighbor cell) cell
 
 rows :: [Int]
 rows = [0..10]
@@ -49,11 +51,32 @@ rows = [0..10]
 cols :: [Int]
 cols = [0..5]
 
-cells :: Cells
-cells = S.fromList $ do
+cells :: [Cell]
+cells = do
   r <- rows
   c <- cols
   return (r, c)
+
+cellSet :: S.Set Cell
+cellSet = S.fromList cells
+
+maybeEdge :: (Cell -> Cell) -> (Cell -> Edge) -> Cell -> Maybe Edge
+maybeEdge neighborF edgeF cell =
+  if S.member (neighborF cell) cellSet
+     then Just (edgeF cell)
+     else Nothing     
+
+edgeStateMap :: M.Map Edge EdgeState
+edgeStateMap = M.fromList . map (flip (,) $ Wall) $ edges
+  where edges = catMaybes $
+          [ maybeEdge topNeighbor topEdge
+          , maybeEdge rightNeighbor rightEdge
+          , maybeEdge bottomNeighbor bottomEdge
+          , maybeEdge leftNeighbor leftEdge
+          ] <*> cells
+
+edgeState :: Edge -> EdgeState
+edgeState edge = fromMaybe Wall . M.lookup edge $ edgeStateMap
 
 data AppState = AppState { greeting :: String } deriving (Eq, Show)
 
@@ -64,16 +87,35 @@ initialAppState = AppState { greeting = "Hello, Newman" }
 style :: Text -> (Text, Prop m)
 style t = ("style", PText t)
 
+borderColors :: Cell -> Text
+borderColors cell = foldr1 (<>) $ 
+  [ borderProp "top" . edgeState . topEdge
+  , borderProp "right" . edgeState . rightEdge
+  , borderProp "bottom" . edgeState . bottomEdge
+  , borderProp "left" . edgeState . leftEdge
+  ] <*> pure cell
+  where
+    color :: EdgeState -> Text
+    color edgeState =
+          case edgeState of
+            Open -> "white"
+            Wall -> "black"
+    borderProp :: Text -> EdgeState -> Text
+    borderProp dir edgeState =
+      "border-" <> dir <> "-color: " <> (color edgeState) <> ";"
+
 tCell :: Int -> Int -> Html AppState
 tCell r c = td [ css ] [ content ]
   where content = text . pack $ "(" <> show r <> ", " <> show c <> ")"
         css = style $
-          "border: 2px solid black;" <>
           "width: 3em;" <>
           "height: 3em;" <>
           "display: inline-flex;" <>
           "justify-content: center;" <>
-          "align-items: center;"
+          "align-items: center;" <>
+          "border-width: 2px;" <>
+          "border-style: solid;" <>
+          borderColors (r, c)
 
 view :: AppState -> Html AppState
 view appState = div_
@@ -88,6 +130,5 @@ view appState = div_
 
 main :: IO ()
 main = do
-  putStrLn "test"
   runJSorWarp 8080 $
     simple runParDiff initialAppState (constly' . view) getBody
