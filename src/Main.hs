@@ -49,10 +49,10 @@ leftEdge :: Cell -> Edge
 leftEdge cell = Edge (leftNeighbor cell) cell
 
 rows :: [Int]
-rows = [0..10]
+rows = [0..20]
 
 cols :: [Int]
-cols = [0..6]
+cols = [0..13]
 
 cells :: [Cell]
 cells = do
@@ -78,59 +78,66 @@ initialEdgeStateMap = M.fromList . map (flip (,) $ Wall) $ edges
           , leftEdge
           ] <*> cells
 
-edgeState :: Edge -> EdgeState
-edgeState edge = fromMaybe Wall . M.lookup edge $ initialEdgeStateMap
+edgeState :: EdgeStateMap -> Edge -> EdgeState
+edgeState edgeStateMap edge = fromMaybe Wall . M.lookup edge $ edgeStateMap
 
-getNeighbors :: Cell -> [Cell]
-getNeighbors cell = filter isCellValid $
-  [ topNeighbor
-  , rightNeighbor
-  , bottomNeighbor
-  , leftNeighbor
-  ] <*> pure cell
+data Direction = TopDir | RightDir | BottomDir | LeftDir deriving (Eq, Enum, Bounded)
 
-{-
+getDirFns :: Direction -> ((Cell -> Cell), (Cell -> Edge))
+getDirFns TopDir = (topNeighbor, topEdge)
+getDirFns RightDir = (rightNeighbor, rightEdge)
+getDirFns BottomDir = (bottomNeighbor, bottomEdge)
+getDirFns LeftDir = (leftNeighbor, leftEdge)
 
-[ n1, n2, n3 ]
+isUnvisited :: S.Set Cell -> Cell -> Bool
+isUnvisited visited neighbor = not . S.member neighbor $ visited
 
-n2
-
-
-
--}
+getRandomDir :: [Direction] -> IO (Maybe Direction, [Direction])
+getRandomDir [] = return (Nothing, [])
+getRandomDir dirs = do
+  i <- randomRIO (0, length dirs - 1)
+  let dir = dirs !! i
+      dirs' = filter (/= dir) dirs
+  return $ (Just dir, dirs')
 
 generateMaze :: IO EdgeStateMap
-generateMaze = go initialEdgeStateMap S.empty (head cells)
-  where go :: EdgeStateMap -> S.Set Cell -> Cell -> IO EdgeStateMap
+generateMaze = do
+  (edgeStateMap, _) <- go initialEdgeStateMap S.empty (head cells)
+  return edgeStateMap
+  where go :: EdgeStateMap -> S.Set Cell -> Cell -> IO (EdgeStateMap, S.Set Cell)
         go edgeStateMap visited cell = do
           let visited' = S.insert cell visited
-              neighbors = getNeighbors cell
-              unvisited = filter (isUnvisited visited') neighbors
-          neighbor <- getRandomNeighbor unvisited
-          return edgeStateMap
-        isUnvisited :: S.Set Cell -> Cell -> Bool
-        isUnvisited visited neighbor = not . S.member neighbor $ visited
-        getRandomNeighbor unvisited = do
-          i <- randomRIO (0, length unvisited - 1)
-          return $ unvisited !! i
+          visitNeighbors edgeStateMap visited' cell [minBound .. maxBound]
+        visitNeighbors :: EdgeStateMap -> S.Set Cell -> Cell -> [Direction] -> IO (EdgeStateMap, S.Set Cell)
+        visitNeighbors edgeStateMap visited cell dirs = do
+          (maybeDir, dirs') <- getRandomDir dirs
+          case maybeDir of
+            Nothing -> return (edgeStateMap, visited)
+            Just dir -> do
+              (edgeStateMap', visited') <- visitNeighbor edgeStateMap visited cell dir
+              visitNeighbors edgeStateMap' visited' cell dirs'
+        visitNeighbor :: EdgeStateMap -> S.Set Cell -> Cell -> Direction -> IO (EdgeStateMap, S.Set Cell)
+        visitNeighbor edgeStateMap visited cell dir = do
+          let (neighborFn, edgeFn) = getDirFns dir
+              neighbor = neighborFn cell
+          if isCellValid neighbor && isUnvisited visited neighbor
+            then do
+              let edgeStateMap' = M.insert (edgeFn cell) Open edgeStateMap
+              go edgeStateMap' visited neighbor
+            else return (edgeStateMap, visited)
 
-
-
-data AppState = AppState { greeting :: String } deriving (Eq, Show)
-
-initialAppState :: AppState
-initialAppState = AppState { greeting = "Hello, Newman" }
+data AppState = AppState { greeting :: String, edgeStateMap :: EdgeStateMap } deriving (Eq, Show)
 
 -- View
 style :: Text -> (Text, Prop m)
 style t = ("style", PText t)
 
-borderColors :: Cell -> Text
-borderColors cell = foldr1 (<>) $
-  [ borderProp "top" . edgeState . topEdge
-  , borderProp "right" . edgeState . rightEdge
-  , borderProp "bottom" . edgeState . bottomEdge
-  , borderProp "left" . edgeState . leftEdge
+borderColors :: EdgeStateMap -> Cell -> Text
+borderColors edgeStateMap cell = foldr1 (<>) $
+  [ borderProp "top" . edgeState edgeStateMap . topEdge
+  , borderProp "right" . edgeState edgeStateMap . rightEdge
+  , borderProp "bottom" . edgeState edgeStateMap . bottomEdge
+  , borderProp "left" . edgeState edgeStateMap . leftEdge
   ] <*> pure cell
   where
     color :: EdgeState -> Text
@@ -142,8 +149,8 @@ borderColors cell = foldr1 (<>) $
     borderProp dir edgeState =
       "border-" <> dir <> "-color: " <> (color edgeState) <> ";"
 
-tCell :: Int -> Int -> Html AppState
-tCell r c = td [ css ] [ content ]
+tCell :: EdgeStateMap -> Int -> Int -> Html AppState
+tCell edgeStateMap r c = td [ css ] [ content ]
   where content = text . pack $ "(" <> show r <> ", " <> show c <> ")"
         css = style $
           "width: 3em;" <>
@@ -153,14 +160,14 @@ tCell r c = td [ css ] [ content ]
           "align-items: center;" <>
           "border-width: 2px;" <>
           "border-style: solid;" <>
-          borderColors (r, c)
+          borderColors edgeStateMap (r, c)
 
 view :: AppState -> Html AppState
 view appState = div_
   [ h1_ [ "The Overlook Maze" ]
   , div_ [ text . pack $ greeting appState ]
   , table [ css ] $
-    map (\r -> tr [] $ map (\c -> tCell r c) cols) rows
+    map (\r -> tr [] $ map (\c -> tCell (edgeStateMap appState) r c) cols) rows
   ]
   where css = style $
           "border-spacing: 0;" <>
@@ -168,5 +175,7 @@ view appState = div_
 
 main :: IO ()
 main = do
+  edgeStateMap' <- generateMaze
+  let initialAppState = AppState { greeting = "Hello, Newman", edgeStateMap = edgeStateMap' } 
   runJSorWarp 8080 $
     simple runParDiff initialAppState (constly' . view) getBody
