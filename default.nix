@@ -19,6 +19,8 @@ let
     ref    = "master";
   };
 
+  Shpadoinkle-css = ../Shpadoinkle-css;
+  css-style-type = ../css-style-type;
 
   # Additional ignore patterns to keep the Nix src clean
   ignorance = [
@@ -51,6 +53,8 @@ let
   # Haskell specific overlay (for you to extend)
   haskell-overlay = hself: hsuper: { 
     "happy" = pkgs.haskell.lib.dontCheck hsuper.happy;
+    Shpadoinkle-css = hself.callCabal2nix "Shpadoinkle-css" Shpadoinkle-css {};
+    css-style-type = hself.callCabal2nix "css-style-type" css-style-type {};
   };
 
 

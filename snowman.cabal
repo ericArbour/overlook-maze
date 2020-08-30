@@ -22,8 +22,9 @@ executable snowman
   build-depends:       base ^>=4.12.0.0
    , containers
    , random
-   , Shpadoinkle
+   , Shpadoinkle                  
    , Shpadoinkle-backend-pardiff
+   , Shpadoinkle-css                  
    , Shpadoinkle-html
    , text                  
   hs-source-dirs:      src
