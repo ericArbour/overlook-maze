@@ -27,10 +27,10 @@ style t = ("style", PText t)
 
 borderColors :: EdgeStateMap -> Cell -> Text
 borderColors edgeStateMap cell = foldr1 (<>) $
-  [ borderProp "top" . edgeState edgeStateMap . topEdge
-  , borderProp "right" . edgeState edgeStateMap . rightEdge
-  , borderProp "bottom" . edgeState edgeStateMap . bottomEdge
-  , borderProp "left" . edgeState edgeStateMap . leftEdge
+  [ borderProp "top" . getEdgeState edgeStateMap . getEdge TopDir
+  , borderProp "right" . getEdgeState edgeStateMap . getEdge RightDir
+  , borderProp "bottom" . getEdgeState edgeStateMap . getEdge BottomDir
+  , borderProp "left" . getEdgeState edgeStateMap . getEdge LeftDir
   ] <*> pure cell
   where
     color :: EdgeState -> Text
