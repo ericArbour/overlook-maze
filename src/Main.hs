@@ -3,12 +3,14 @@
 module Main where
 
 import           Data.Maybe                  (catMaybes, fromMaybe)
-import           Data.Text                   (Text, pack)
+import           Data.Text                   (Text, pack, unpack)
 import           Shpadoinkle
 import           Shpadoinkle.Backend.ParDiff
 -- Note: I was unable to import "main" and "main_" from Shpadoinkle.Html
 -- but I could import "main'" and "main'_"
-import           Shpadoinkle.Html            (div_, getBody, h1_, table, td, tr)
+import           Shpadoinkle.Html            (div_, getBody, h1_, option, select, table, td, tr)
+import Shpadoinkle.Html.Event (onOption)
+import Shpadoinkle.Html.Property (selected, value)
 import           System.Random               (randomRIO)
 
 import qualified Data.Map.Strict             as M
@@ -16,12 +18,13 @@ import qualified Data.Set                    as S
 
 import           Maze
 
+data MazeSize = Small | Medium | Large deriving (Bounded, Enum, Eq, Read, Show)
+
 data AppState = AppState
-  { greeting     :: String
+  { mazeSize     :: MazeSize
   , edgeStateMap :: EdgeStateMap
   } deriving (Eq, Show)
 
--- View
 style :: Text -> (Text, Prop m)
 style t = ("style", PText t)
 
@@ -55,10 +58,20 @@ tCell edgeStateMap r c = td [ css ] [ content ]
           "border-style: solid;" <>
           borderColors edgeStateMap (r, c)
 
+sizeSelect :: MazeSize -> Html MazeSize
+sizeSelect ms = select [ onOption $ read . unpack ]
+  $ sizeOption <$> [ minBound .. maxBound ]
+  where
+    sizeOption :: MazeSize -> Html MazeSize
+    sizeOption size = option
+          [ value . pack $ show size, selected $ isSelected size ]
+          [ text . pack $ show size ]
+    isSelected = (== ms)
+
 view :: AppState -> Html AppState
 view appState = div_
   [ h1_ [ "The Overlook Maze" ]
-  , div_ [ text . pack $ greeting appState ]
+  , (\ms -> appState { mazeSize = ms } ) <$> sizeSelect (mazeSize appState)
   , table [ css ] $
     map (\r -> tr [] $ map (\c -> tCell (edgeStateMap appState) r c) cols) rows
   ]
@@ -70,6 +83,6 @@ main :: IO ()
 main = do
   edgeStateMap' <- generateMaze
   let initialAppState =
-        AppState { greeting = "Hello, Newman", edgeStateMap = edgeStateMap' }
+        AppState { mazeSize = Medium, edgeStateMap = edgeStateMap' }
   runJSorWarp 8080 $
     simple runParDiff initialAppState (constly' . view) getBody
