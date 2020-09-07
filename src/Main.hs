@@ -2,15 +2,17 @@
 
 module Main where
 
+import Control.Monad.IO.Class 
 import           Data.Maybe                  (catMaybes, fromMaybe)
 import           Data.Text                   (Text, pack, unpack)
 import           Shpadoinkle
 import           Shpadoinkle.Backend.ParDiff
 -- Note: I was unable to import "main" and "main_" from Shpadoinkle.Html
 -- but I could import "main'" and "main'_"
-import           Shpadoinkle.Html            (div_, getBody, h1_, option, select, table, td, tr)
-import Shpadoinkle.Html.Event (onOption)
-import Shpadoinkle.Html.Property (selected, value)
+import           Shpadoinkle.Html            (div_, getBody, h1_, option,
+                                              select, table, td, tr)
+import           Shpadoinkle.Html.Event      (onOptionM)
+import           Shpadoinkle.Html.Property   (selected, value)
 import           System.Random               (randomRIO)
 
 import qualified Data.Map.Strict             as M
@@ -18,15 +20,13 @@ import qualified Data.Set                    as S
 
 import           Maze
 
-data MazeSize = Small | Medium | Large deriving (Bounded, Enum, Eq, Read, Show)
-
 data AppState = AppState
-  { mazeSize     :: MazeSize
-  , edgeStateMap :: EdgeStateMap
+  { mazeSize :: MazeSize
+  , maze     :: Maze
   } deriving (Eq, Show)
 
-style :: Text -> (Text, Prop m)
-style t = ("style", PText t)
+style :: Text -> (Text, PropM m o)
+style t = ("style", textProp t)
 
 borderColors :: EdgeStateMap -> Cell -> Text
 borderColors edgeStateMap cell = foldr1 (<>) $
@@ -45,7 +45,7 @@ borderColors edgeStateMap cell = foldr1 (<>) $
     borderProp dir edgeState =
       "border-" <> dir <> "-color: " <> (color edgeState) <> ";"
 
-tCell :: EdgeStateMap -> Int -> Int -> Html AppState
+tCell :: MonadIO m => EdgeStateMap -> Int -> Int -> HtmlM m AppState
 tCell edgeStateMap r c = td [ css ] [ content ]
   where content = text . pack $ "(" <> show r <> ", " <> show c <> ")"
         css = style $
@@ -58,31 +58,39 @@ tCell edgeStateMap r c = td [ css ] [ content ]
           "border-style: solid;" <>
           borderColors edgeStateMap (r, c)
 
-sizeSelect :: MazeSize -> Html MazeSize
-sizeSelect ms = select [ onOption $ read . unpack ]
+sizeSelect :: MonadIO m => AppState -> HtmlM m AppState
+sizeSelect appState = select [ onOptionM handleOption ]
   $ sizeOption <$> [ minBound .. maxBound ]
   where
-    sizeOption :: MazeSize -> Html MazeSize
+    sizeOption :: MonadIO m => MazeSize -> HtmlM m AppState
     sizeOption size = option
           [ value . pack $ show size, selected $ isSelected size ]
           [ text . pack $ show size ]
-    isSelected = (== ms)
+    isSelected = (== (mazeSize appState))
+    handleOption msText = do
+      let mazeSize' = read $ unpack msText
+      maze' <- liftIO $ generateMaze mazeSize'
+      return $ \appState' ->
+                 appState' { maze = maze'
+                           , mazeSize = mazeSize'
+                           }
 
-view :: AppState -> Html AppState
+view :: MonadIO m => AppState -> HtmlM m AppState
 view appState = div_
   [ h1_ [ "The Overlook Maze" ]
-  , (\ms -> appState { mazeSize = ms } ) <$> sizeSelect (mazeSize appState)
+  , sizeSelect appState
   , table [ css ] $
-    map (\r -> tr [] $ map (\c -> tCell (edgeStateMap appState) r c) cols) rows
+    map (\r -> tr [] $ map (\c -> tCell edgeStateMap r c) cols) rows
   ]
-  where css = style $
+  where (rows, cols, edgeStateMap) = maze appState
+        css = style $
           "border-spacing: 0;" <>
           "border: 2px solid black;"
 
 main :: IO ()
 main = do
-  edgeStateMap' <- generateMaze
+  initialMaze <- generateMaze Medium
   let initialAppState =
-        AppState { mazeSize = Medium, edgeStateMap = edgeStateMap' }
+        AppState { mazeSize = Medium, maze = initialMaze }
   runJSorWarp 8080 $
-    simple runParDiff initialAppState (constly' . view) getBody
+    simple runParDiff initialAppState view getBody
