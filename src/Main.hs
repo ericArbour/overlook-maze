@@ -2,7 +2,7 @@
 
 module Main where
 
-import Control.Monad.IO.Class 
+import           Control.Monad.IO.Class
 import           Data.Maybe                  (catMaybes, fromMaybe)
 import           Data.Text                   (Text, pack, unpack)
 import           Shpadoinkle

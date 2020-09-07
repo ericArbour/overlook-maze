@@ -19,6 +19,10 @@ import           System.Random   (randomRIO)
 
 type Cell = (Int, Int)
 
+newtype ValidCells = ValidCells { getValidCells :: S.Set Cell }
+
+newtype VisitedCells = VisitedCells { getVisitedCells :: S.Set Cell }
+
               -- Top  Bottom
               -- Left Right
 data Edge = Edge Cell Cell deriving (Eq, Ord, Show)
@@ -49,17 +53,18 @@ getEdge BottomDir cell = Edge cell (getNeighbor BottomDir cell)
 getEdge LeftDir cell   = Edge (getNeighbor LeftDir cell) cell
 
 getEdgeState :: EdgeStateMap -> Edge -> EdgeState
-getEdgeState edgeStateMap edge = fromMaybe Wall . M.lookup edge $ edgeStateMap
+getEdgeState edgeStateMap edge = fromMaybe Wall $ M.lookup edge edgeStateMap
 
-isCellValid :: S.Set Cell -> Cell -> Bool
-isCellValid cellSet cell = S.member cell cellSet
+isCellValid :: ValidCells -> Cell -> Bool
+isCellValid validCells cell = S.member cell (getValidCells validCells)
 
-isEdgeValid :: S.Set Cell -> Edge -> Bool
-isEdgeValid cellSet (Edge cell1 cell2) =
-  isCellValid cellSet cell1 && isCellValid cellSet cell2
+isEdgeValid :: ValidCells -> Edge -> Bool
+isEdgeValid validCells (Edge cell1 cell2) =
+  isCellValid validCells cell1 && isCellValid validCells cell2
 
-isUnvisited :: S.Set Cell -> Cell -> Bool
-isUnvisited visited neighbor = not . S.member neighbor $ visited
+isUnvisited :: VisitedCells -> Cell -> Bool
+isUnvisited visitedCells neighbor =
+  not . S.member neighbor $ getVisitedCells visitedCells
 
 getRandomDir :: [Direction] -> IO (Maybe Direction, [Direction])
 getRandomDir [] = return (Nothing, [])
@@ -71,50 +76,52 @@ getRandomDir dirs = do
 
 -- Maze ----------------------------------------------------------------------------
 
-getInitialEdgeStateMap :: [Cell] -> S.Set Cell -> EdgeStateMap
-getInitialEdgeStateMap cells cellSet = M.fromList . map (flip (,) $ Wall) $ edges
-  where edges = filter (isEdgeValid cellSet) $
-          pure getEdge <*> [ minBound .. maxBound ] <*> cells
+getInitialEdgeStateMap :: [Cell] -> ValidCells -> EdgeStateMap
+getInitialEdgeStateMap cells validCells = M.fromList . map (flip (,) $ Wall) $ edges
+  where edges = filter (isEdgeValid validCells) $
+          getEdge <$> [ minBound .. maxBound ] <*> cells
 
 visitNeighbor ::
-  S.Set Cell ->
+  ValidCells ->
+  VisitedCells ->
   EdgeStateMap ->
-  S.Set Cell ->
   Direction ->
   Cell ->
-  IO (EdgeStateMap, S.Set Cell)
-visitNeighbor cellSet edgeStateMap visited dir cell = do
+  IO (EdgeStateMap, VisitedCells)
+visitNeighbor validCells visitedCells  edgeStateMap dir cell = do
   let neighbor = getNeighbor dir cell
-  if isCellValid cellSet neighbor && isUnvisited visited neighbor
+  if isCellValid validCells neighbor && isUnvisited visitedCells neighbor
     then do
       let edgeStateMap' = M.insert (getEdge dir cell) Open edgeStateMap
-      visitCell cellSet edgeStateMap' visited neighbor
-    else return (edgeStateMap, visited)
+      visitCell validCells visitedCells edgeStateMap' neighbor
+    else return (edgeStateMap, visitedCells)
 
 visitNeighbors ::
-  S.Set Cell ->
+  ValidCells ->
+  VisitedCells ->
   EdgeStateMap ->
-  S.Set Cell ->
   [Direction] ->
   Cell ->
-  IO (EdgeStateMap, S.Set Cell)
-visitNeighbors cellSet edgeStateMap visited dirs cell = do
+  IO (EdgeStateMap, VisitedCells)
+visitNeighbors validCells visitedCells edgeStateMap dirs cell = do
   (maybeDir, dirs') <- getRandomDir dirs
   case maybeDir of
-    Nothing -> return (edgeStateMap, visited)
+    Nothing -> return (edgeStateMap, visitedCells)
     Just dir -> do
-      (edgeStateMap', visited') <- visitNeighbor cellSet edgeStateMap visited dir cell
-      visitNeighbors cellSet edgeStateMap' visited' dirs' cell
+      (edgeStateMap', visitedCells') <-
+        visitNeighbor validCells visitedCells  edgeStateMap dir cell
+      visitNeighbors validCells visitedCells' edgeStateMap' dirs' cell
 
 visitCell ::
-  S.Set Cell ->
+  ValidCells ->
+  VisitedCells ->
   EdgeStateMap ->
-  S.Set Cell ->
   Cell ->
-  IO (EdgeStateMap, S.Set Cell)
-visitCell cellSet edgeStateMap visited cell = do
-  let visited' = S.insert cell visited
-  visitNeighbors cellSet edgeStateMap visited' [minBound .. maxBound] cell
+  IO (EdgeStateMap, VisitedCells)
+visitCell validCells visitedCells edgeStateMap cell = do
+  let visitedCells' =
+        visitedCells { getVisitedCells = S.insert cell (getVisitedCells visitedCells) }
+  visitNeighbors validCells visitedCells' edgeStateMap [minBound .. maxBound] cell
 
 getCells :: ([Int], [Int]) -> [Cell]
 getCells (rows, cols) = do
@@ -133,8 +140,8 @@ generateMaze :: MazeSize -> IO ([Int], [Int], EdgeStateMap)
 generateMaze mazeSize = do
   let (rows, cols) = getMazeDimensions mazeSize
       cells = getCells (rows, cols)
-      cellSet = S.fromList cells
-      initialEdgeStateMap = getInitialEdgeStateMap cells cellSet
-  (edgeStateMap, _) <- visitCell cellSet initialEdgeStateMap S.empty (head cells)
+      validCells = ValidCells { getValidCells = S.fromList cells}
+      visitedCells = VisitedCells { getVisitedCells = S.empty }
+      initialEdgeStateMap = getInitialEdgeStateMap cells validCells
+  (edgeStateMap, _) <- visitCell validCells visitedCells initialEdgeStateMap (head cells)
   return (rows, cols, edgeStateMap)
-
