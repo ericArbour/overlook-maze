@@ -58,22 +58,23 @@ tCell edgeStateMap r c = td [ css ] [ content ]
           "border-style: solid;" <>
           borderColors edgeStateMap (r, c)
 
+sizeOption :: MonadIO m => MazeSize -> MazeSize -> HtmlM m AppState
+sizeOption currentSize size = option
+      [ value . pack $ show size, selected $ currentSize == size ]
+      [ text . pack $ show size ]
+
 sizeSelect :: MonadIO m => AppState -> HtmlM m AppState
 sizeSelect appState = select [ onOptionM handleOption ]
-  $ sizeOption <$> [ minBound .. maxBound ]
+  $ sizeOption (mazeSize appState) <$> [ minBound .. maxBound ]
   where
-    sizeOption :: MonadIO m => MazeSize -> HtmlM m AppState
-    sizeOption size = option
-          [ value . pack $ show size, selected $ isSelected size ]
-          [ text . pack $ show size ]
-    isSelected = (== (mazeSize appState))
     handleOption msText = do
       let mazeSize' = read $ unpack msText
       maze' <- liftIO $ generateMaze mazeSize'
-      return $ \appState' ->
-                 appState' { maze = maze'
-                           , mazeSize = mazeSize'
-                           }
+      return $ updateState maze' mazeSize'
+    updateState maze' mazeSize' appState' =
+      appState' { maze = maze'
+                , mazeSize = mazeSize'
+                }
 
 view :: MonadIO m => AppState -> HtmlM m AppState
 view appState = div_
