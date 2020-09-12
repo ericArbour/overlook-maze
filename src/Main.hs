@@ -11,10 +11,11 @@ import           Shpadoinkle
 import           Shpadoinkle.Backend.ParDiff
 -- Note: I was unable to import "main" and "main_" from Shpadoinkle.Html
 -- but I could import "main'" and "main'_"
-import           Shpadoinkle.Html            (div_, getBody, h1_, option, select,
-                                              table, td, tr)
-import           Shpadoinkle.Html.Event      (onKeydownM, onOptionM)
+import           Shpadoinkle.Html            (div_, getBody, h1_, option,
+                                              select, table, td, tr)
+import           Shpadoinkle.Html.Event      (onKeydown, onOptionM)
 import           Shpadoinkle.Html.Property   (selected, tabbable, value)
+import           Shpadoinkle.Keyboard
 import           System.Random               (randomRIO)
 
 import qualified Data.Map.Strict             as M
@@ -79,22 +80,30 @@ sizeSelect appState = select [ onOptionM handleOption ]
                 , mazeSize = mazeSize'
                 }
 
+playerStep :: AppState -> Direction -> AppState
+playerStep appState dir = appState
+
+handleKeydown :: AppState -> KeyCode -> AppState
+handleKeydown appState UpArrow    = playerStep appState TopDir
+handleKeydown appState RightArrow = playerStep appState RightDir
+handleKeydown appState DownArrow  = playerStep appState BottomDir
+handleKeydown appState LeftArrow  = playerStep appState LeftDir
+handleKeydown appState _          = appState
+
 view :: MonadIO m => AppState -> HtmlM m AppState
 view appState = div_
   [ h1_ [ "The Overlook Maze" ]
   , sizeSelect appState
-  , table [ tabbable, onKeydownM handleKeydown, css ] $ rows <&>
-    \r -> tr [] $ cols <&>
-    \c -> tCell edgeStateMap pLoc' (r, c)
+  , table [ tabbable, onKeydown (handleKeydown appState), css ] $
+      rows <&> \r -> tr [] $
+        cols <&> \c -> tCell edgeStateMap pLoc' (r, c)
   ]
   where (rows, cols, edgeStateMap) = maze appState
         pLoc' = pLoc appState
         css = style $
           "border-spacing: 0;" <>
           "border: 2px solid black;"
-        handleKeydown keyCode =
-          return $ \appState' -> appState
-        
+
 
 main :: IO ()
 main = do
