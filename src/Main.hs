@@ -78,10 +78,17 @@ sizeSelect appState = select [ onOptionM handleOption ]
     updateState maze' mazeSize' appState' =
       appState' { maze = maze'
                 , mazeSize = mazeSize'
+                , pLoc = (0, 0)
                 }
 
 playerStep :: AppState -> Direction -> AppState
-playerStep appState dir = appState
+playerStep appState dir =
+  if isCellValid validCells neighbor && getEdgeState edgeStateMap edge == Open
+  then appState { pLoc = neighbor }
+  else appState
+  where Maze _ _ edgeStateMap validCells = maze appState
+        neighbor = getNeighbor dir (pLoc appState)
+        edge = getEdge dir (pLoc appState)
 
 handleKeydown :: AppState -> KeyCode -> AppState
 handleKeydown appState UpArrow    = playerStep appState TopDir
@@ -98,7 +105,7 @@ view appState = div_
       rows <&> \r -> tr [] $
         cols <&> \c -> tCell edgeStateMap pLoc' (r, c)
   ]
-  where (rows, cols, edgeStateMap) = maze appState
+  where Maze rows cols edgeStateMap _ = maze appState
         pLoc' = pLoc appState
         css = style $
           "border-spacing: 0;" <>

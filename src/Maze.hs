@@ -3,10 +3,12 @@ module Maze
   , EdgeState(..)
   , Cell
   , Direction(..)
-  , Maze
+  , Maze(..)
   , MazeSize(..)
   , getEdge
   , getEdgeState
+  , getNeighbor
+  , isCellValid
   , generateMaze
   ) where
 
@@ -19,7 +21,7 @@ import           System.Random   (randomRIO)
 
 type Cell = (Int, Int)
 
-newtype ValidCells = ValidCells { getValidCells :: S.Set Cell }
+newtype ValidCells = ValidCells { getValidCells :: S.Set Cell } deriving (Eq, Show)
 
 newtype VisitedCells = VisitedCells { getVisitedCells :: S.Set Cell }
 
@@ -36,7 +38,7 @@ data Direction = TopDir | RightDir | BottomDir | LeftDir deriving (Eq, Enum, Bou
 data MazeSize = Small | Medium | Large deriving (Bounded, Enum, Eq, Read, Show)
 
             --rows --cols
-type Maze = ([Int], [Int], EdgeStateMap)
+data Maze = Maze [Int] [Int] EdgeStateMap ValidCells deriving (Eq, Show)
 
 -- Utils ---------------------------------------------------------------------------
 
@@ -136,7 +138,7 @@ getMazeDimensions mazeSize = ([0..rowCount], [0..colCount])
                      Medium -> (15, 10)
                      Large  -> (20, 15)
 
-generateMaze :: MazeSize -> IO ([Int], [Int], EdgeStateMap)
+generateMaze :: MazeSize -> IO Maze
 generateMaze mazeSize = do
   let (rows, cols) = getMazeDimensions mazeSize
       cells = getCells (rows, cols)
@@ -144,4 +146,4 @@ generateMaze mazeSize = do
       visitedCells = VisitedCells { getVisitedCells = S.empty }
       initialEdgeStateMap = getInitialEdgeStateMap cells validCells
   (edgeStateMap, _) <- visitCell validCells visitedCells initialEdgeStateMap (head cells)
-  return (rows, cols, edgeStateMap)
+  return $ Maze rows cols edgeStateMap validCells
