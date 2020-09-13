@@ -24,34 +24,34 @@ import qualified Data.Set                    as S
 import           Maze
 
 data AppState = AppState
-  { mazeSize :: MazeSize
-  , maze     :: Maze
-  , pLoc     :: Cell
+  { mazeSize   :: MazeSize
+  , maze       :: Maze
+  , playerCell :: Cell
   } deriving (Eq, Show)
 
 style :: Text -> (Text, PropM m o)
 style t = ("style", textProp t)
 
-borderColors :: EdgeStateMap -> Cell -> Text
-borderColors edgeStateMap cell = foldr1 (<>) $
-  [ borderProp "top" . getEdgeState edgeStateMap . getEdge TopDir
-  , borderProp "right" . getEdgeState edgeStateMap . getEdge RightDir
-  , borderProp "bottom" . getEdgeState edgeStateMap . getEdge BottomDir
-  , borderProp "left" . getEdgeState edgeStateMap . getEdge LeftDir
+borderColors :: Maze -> Cell -> Text
+borderColors maze cell = foldr1 (<>) $
+  [ borderProp "top" . hasWall maze TopDir
+  , borderProp "right" . hasWall maze RightDir
+  , borderProp "bottom" . hasWall maze BottomDir
+  , borderProp "left" . hasWall maze LeftDir
   ] <*> pure cell
   where
-    color :: EdgeState -> Text
-    color edgeState =
-          case edgeState of
-            Open -> "white"
-            Wall -> "black"
-    borderProp :: Text -> EdgeState -> Text
-    borderProp dir edgeState =
-      "border-" <> dir <> "-color: " <> (color edgeState) <> ";"
+    color :: Bool -> Text
+    color isWall =
+      if isWall
+      then "black"
+      else "white"
+    borderProp :: Text -> Bool -> Text
+    borderProp dir isWall =
+      "border-" <> dir <> "-color: " <> (color isWall) <> ";"
 
-tCell :: MonadIO m => EdgeStateMap -> Cell -> Cell -> HtmlM m AppState
-tCell edgeStateMap pLoc' cell = td [ css ] [ content ]
-  where content = text . pack $ if pLoc' == cell then "X" else ""
+tCell :: MonadIO m => AppState -> Cell -> HtmlM m AppState
+tCell appState cell = td [ css ] [ content ]
+  where content = text . pack $ if (playerCell appState) == cell then "X" else ""
         css = style $
           "width: 3em;" <>
           "height: 3em;" <>
@@ -60,7 +60,7 @@ tCell edgeStateMap pLoc' cell = td [ css ] [ content ]
           "align-items: center;" <>
           "border-width: 2px;" <>
           "border-style: solid;" <>
-          borderColors edgeStateMap cell
+          borderColors (maze appState) cell
 
 sizeOption :: MonadIO m => MazeSize -> MazeSize -> HtmlM m AppState
 sizeOption currentSize size = option
@@ -78,17 +78,14 @@ sizeSelect appState = select [ onOptionM handleOption ]
     updateState maze' mazeSize' appState' =
       appState' { maze = maze'
                 , mazeSize = mazeSize'
-                , pLoc = (0, 0)
+                , playerCell = (0, 0)
                 }
 
 playerStep :: AppState -> Direction -> AppState
 playerStep appState dir =
-  if isCellValid validCells neighbor && getEdgeState edgeStateMap edge == Open
-  then appState { pLoc = neighbor }
-  else appState
-  where Maze _ _ edgeStateMap validCells = maze appState
-        neighbor = getNeighbor dir (pLoc appState)
-        edge = getEdge dir (pLoc appState)
+  case mazeStep (maze appState) dir (playerCell appState) of
+    Just neighbor -> appState { playerCell = neighbor }
+    Nothing       -> appState
 
 handleKeydown :: AppState -> KeyCode -> AppState
 handleKeydown appState UpArrow    = playerStep appState TopDir
@@ -102,12 +99,10 @@ view appState = div_
   [ h1_ [ "The Overlook Maze" ]
   , sizeSelect appState
   , table [ tabbable, onKeydown (handleKeydown appState), css ] $
-      rows <&> \r -> tr [] $
-        cols <&> \c -> tCell edgeStateMap pLoc' (r, c)
+      mapRows (maze appState) $ \r -> tr [] $
+        mapCols (maze appState) $ \c -> tCell appState (r, c)
   ]
-  where Maze rows cols edgeStateMap _ = maze appState
-        pLoc' = pLoc appState
-        css = style $
+  where css = style $
           "border-spacing: 0;" <>
           "border: 2px solid black;"
 
@@ -116,6 +111,6 @@ main :: IO ()
 main = do
   initialMaze <- generateMaze Medium
   let initialAppState =
-        AppState { mazeSize = Medium, maze = initialMaze, pLoc = (0, 0) }
+        AppState { mazeSize = Medium, maze = initialMaze, playerCell = (0, 0) }
   runJSorWarp 8080 $
     simple runParDiff initialAppState view getBody

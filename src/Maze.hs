@@ -1,21 +1,20 @@
 module Maze
-  ( EdgeStateMap
-  , EdgeState(..)
-  , Cell
+  ( Cell
   , Direction(..)
-  , Maze(..)
+  , Maze
   , MazeSize(..)
-  , getEdge
-  , getEdgeState
-  , getNeighbor
-  , isCellValid
   , generateMaze
+  , hasWall
+  , mapCols
+  , mapRows
+  , mazeStep
   ) where
 
 import qualified Data.Map.Strict as M
 import           Data.Maybe      (fromMaybe)
 import qualified Data.Set        as S
 import           System.Random   (randomRIO)
+
 
 -- Types ---------------------------------------------------------------------------
 
@@ -38,9 +37,14 @@ data Direction = TopDir | RightDir | BottomDir | LeftDir deriving (Eq, Enum, Bou
 data MazeSize = Small | Medium | Large deriving (Bounded, Enum, Eq, Read, Show)
 
             --rows --cols
-data Maze = Maze [Int] [Int] EdgeStateMap ValidCells deriving (Eq, Show)
+data Maze = Maze
+  { rows         :: [Int]
+  , cols         :: [Int]
+  , edgeStateMap :: EdgeStateMap
+  , validCells   ::  ValidCells
+  } deriving (Eq, Show)
 
--- Utils ---------------------------------------------------------------------------
+-- Private Utils -------------------------------------------------------------------
 
 getNeighbor :: Direction -> Cell -> Cell
 getNeighbor TopDir (r, c)    = (r - 1, c)
@@ -76,12 +80,26 @@ getRandomDir dirs = do
       dirs' = filter (/= dir) dirs
   return $ (Just dir, dirs')
 
--- Maze ----------------------------------------------------------------------------
+getCells :: ([Int], [Int]) -> [Cell]
+getCells (rows, cols) = do
+  r <- rows
+  c <- cols
+  return (r, c)
+
+getMazeDimensions :: MazeSize -> ([Int], [Int])
+getMazeDimensions mazeSize = ([0..rowCount], [0..colCount])
+  where (rowCount, colCount) = case mazeSize of
+                     Small  -> (10, 5)
+                     Medium -> (15, 10)
+                     Large  -> (20, 15)
 
 getInitialEdgeStateMap :: [Cell] -> ValidCells -> EdgeStateMap
 getInitialEdgeStateMap cells validCells = M.fromList . map (flip (,) $ Wall) $ edges
   where edges = filter (isEdgeValid validCells) $
           getEdge <$> [ minBound .. maxBound ] <*> cells
+
+-- Maze Generation ------------------------------------------------------------------
+-- https://en.wikipedia.org/wiki/Maze_generation_algorithm#Recursive_implementation
 
 visitNeighbor ::
   ValidCells ->
@@ -125,18 +143,27 @@ visitCell validCells visitedCells edgeStateMap cell = do
         visitedCells { getVisitedCells = S.insert cell (getVisitedCells visitedCells) }
   visitNeighbors validCells visitedCells' edgeStateMap [minBound .. maxBound] cell
 
-getCells :: ([Int], [Int]) -> [Cell]
-getCells (rows, cols) = do
-  r <- rows
-  c <- cols
-  return (r, c)
+-- Public Functions -----------------------------------------------------------------
 
-getMazeDimensions :: MazeSize -> ([Int], [Int])
-getMazeDimensions mazeSize = ([0..rowCount], [0..colCount])
-  where (rowCount, colCount) = case mazeSize of
-                     Small  -> (10, 5)
-                     Medium -> (15, 10)
-                     Large  -> (20, 15)
+mapRows :: Maze -> (Int -> a) -> [a]
+mapRows maze f = map f (rows maze)
+
+mapCols :: Maze -> (Int -> a) -> [a]
+mapCols maze f = map f (cols maze)
+
+hasWall :: Maze -> Direction -> Cell -> Bool
+hasWall maze dir = isWall . getEdgeState (edgeStateMap maze) . getEdge dir
+  where isWall Wall = True
+        isWall Open = False
+
+mazeStep :: Maze -> Direction -> Cell -> Maybe Cell
+mazeStep maze dir currentCell =
+  if isCellValid (validCells maze) neighbor &&
+     getEdgeState (edgeStateMap maze) edge == Open
+  then Just neighbor
+  else Nothing
+  where neighbor = getNeighbor dir currentCell
+        edge = getEdge dir currentCell
 
 generateMaze :: MazeSize -> IO Maze
 generateMaze mazeSize = do
