@@ -11,7 +11,7 @@ import           Shpadoinkle
 import           Shpadoinkle.Backend.ParDiff
 -- Note: I was unable to import "main" and "main_" from Shpadoinkle.Html
 -- but I could import "main'" and "main'_"
-import           Shpadoinkle.Html            (div_, getBody, h1_, option,
+import           Shpadoinkle.Html            (div, getBody, h1_, option,
                                               select, table, td, tr)
 import           Shpadoinkle.Html.Event      (onKeydown, onOptionM)
 import           Shpadoinkle.Html.Property   (selected, tabbable, value)
@@ -43,8 +43,8 @@ borderColors maze cell = foldr1 (<>) $
     color :: Bool -> Text
     color isWall =
       if isWall
-      then "black"
-      else "white"
+      then "var(--wall-color);"
+      else "var(--open-color);"
     borderProp :: Text -> Bool -> Text
     borderProp dir isWall =
       "border-" <> dir <> "-color: " <> (color isWall) <> ";"
@@ -53,8 +53,8 @@ tCell :: MonadIO m => AppState -> Cell -> HtmlM m AppState
 tCell appState cell = td [ css ] [ content ]
   where content = text . pack $ if (playerCell appState) == cell then "X" else ""
         css = style $
-          "width: 3em;" <>
-          "height: 3em;" <>
+          "width: calc(1em + 2vmin);" <>
+          "height: calc(1em + 2vmin);" <>
           "display: inline-flex;" <>
           "justify-content: center;" <>
           "align-items: center;" <>
@@ -95,16 +95,25 @@ handleKeydown appState LeftArrow  = playerStep appState LeftDir
 handleKeydown appState _          = appState
 
 view :: MonadIO m => AppState -> HtmlM m AppState
-view appState = div_
+view appState = div [ containerCss ]
   [ h1_ [ "The Overlook Maze" ]
   , sizeSelect appState
-  , table [ tabbable, onKeydown (handleKeydown appState), css ] $
+  , table [ tabbable, onKeydown (handleKeydown appState), tableCss ] $
       mapRows (maze appState) $ \r -> tr [] $
         mapCols (maze appState) $ \c -> tCell appState (r, c)
   ]
-  where css = style $
-          "border-spacing: 0;" <>
-          "border: 2px solid black;"
+  where
+    containerCss = style $
+      "--wall-color: #27394d;" <>
+      "--open-color: #6381b7;" <>
+      "background-color: var(--wall-color);" <>
+      "color: white;" <>
+      "padding: 1em;"
+    tableCss = style $
+      "margin: 0 auto;" <>
+      "border-spacing: 0;" <>
+      "border: 2px solid var(--wall-color);" <>
+      "background-color: var(--open-color);"
 
 
 main :: IO ()

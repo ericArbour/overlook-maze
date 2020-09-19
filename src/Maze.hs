@@ -58,8 +58,8 @@ getEdge RightDir cell  = Edge cell (getNeighbor RightDir cell)
 getEdge BottomDir cell = Edge cell (getNeighbor BottomDir cell)
 getEdge LeftDir cell   = Edge (getNeighbor LeftDir cell) cell
 
-getEdgeState :: EdgeStateMap -> Edge -> EdgeState
-getEdgeState edgeStateMap edge = fromMaybe Wall $ M.lookup edge edgeStateMap
+getEdgeState :: EdgeStateMap -> Edge -> Maybe EdgeState
+getEdgeState edgeStateMap edge = M.lookup edge edgeStateMap
 
 isCellValid :: ValidCells -> Cell -> Bool
 isCellValid validCells cell = S.member cell (getValidCells validCells)
@@ -143,7 +143,7 @@ visitCell validCells visitedCells edgeStateMap cell = do
         visitedCells { getVisitedCells = S.insert cell (getVisitedCells visitedCells) }
   visitNeighbors validCells visitedCells' edgeStateMap [minBound .. maxBound] cell
 
--- Public Functions -----------------------------------------------------------------
+-- Public ---------------------------------------------------------------------------
 
 mapRows :: Maze -> (Int -> a) -> [a]
 mapRows maze f = map f (rows maze)
@@ -153,13 +153,13 @@ mapCols maze f = map f (cols maze)
 
 hasWall :: Maze -> Direction -> Cell -> Bool
 hasWall maze dir = isWall . getEdgeState (edgeStateMap maze) . getEdge dir
-  where isWall Wall = True
-        isWall Open = False
+  where isWall (Just Wall) = True
+        isWall _           = False
 
 mazeStep :: Maze -> Direction -> Cell -> Maybe Cell
 mazeStep maze dir currentCell =
   if isCellValid (validCells maze) neighbor &&
-     getEdgeState (edgeStateMap maze) edge == Open
+     getEdgeState (edgeStateMap maze) edge == Just Open
   then Just neighbor
   else Nothing
   where neighbor = getNeighbor dir currentCell
