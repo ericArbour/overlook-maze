@@ -3,7 +3,6 @@
 module Main where
 
 import           Control.Monad.IO.Class
-import           Data.Functor                ((<&>))
 import           Data.Maybe                  (catMaybes, fromMaybe)
 import           Data.Text                   (Text, pack, unpack)
 import           Prelude                     hiding (div)
@@ -11,8 +10,8 @@ import           Shpadoinkle
 import           Shpadoinkle.Backend.ParDiff
 -- Note: I was unable to import "main" and "main_" from Shpadoinkle.Html
 -- but I could import "main'" and "main'_"
-import           Shpadoinkle.Html            (div, getBody, h1_, option,
-                                              select, table, td, tr)
+import           Shpadoinkle.Html            (div, getBody, h1_, option, select,
+                                              table, td, tr)
 import           Shpadoinkle.Html.Event      (onKeydown, onOptionM)
 import           Shpadoinkle.Html.Property   (selected, tabbable, value)
 import           Shpadoinkle.Keyboard
@@ -47,11 +46,11 @@ borderColors maze cell = foldr1 (<>) $
       else "var(--open-color);"
     borderProp :: Text -> Bool -> Text
     borderProp dir isWall =
-      "border-" <> dir <> "-color: " <> (color isWall) <> ";"
+      "border-" <> dir <> "-color: " <> color isWall <> ";"
 
 tCell :: MonadIO m => AppState -> Cell -> HtmlM m AppState
 tCell appState cell = td [ css ] [ content ]
-  where content = text . pack $ if (playerCell appState) == cell then "X" else ""
+  where content = text . pack $ if playerCell appState == cell then "X" else ""
         css = style $
           "width: calc(1em + 2vmin);" <>
           "height: calc(1em + 2vmin);" <>

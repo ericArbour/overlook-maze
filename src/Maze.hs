@@ -78,7 +78,7 @@ getRandomDir dirs = do
   i <- randomRIO (0, length dirs - 1)
   let dir = dirs !! i
       dirs' = filter (/= dir) dirs
-  return $ (Just dir, dirs')
+  return (Just dir, dirs')
 
 getCells :: ([Int], [Int]) -> [Cell]
 getCells (rows, cols) = do
@@ -94,7 +94,7 @@ getMazeDimensions mazeSize = ([0..rowCount], [0..colCount])
                      Large  -> (20, 15)
 
 getInitialEdgeStateMap :: [Cell] -> ValidCells -> EdgeStateMap
-getInitialEdgeStateMap cells validCells = M.fromList . map (flip (,) $ Wall) $ edges
+getInitialEdgeStateMap cells validCells = M.fromList . map (flip (,) Wall) $ edges
   where edges = filter (isEdgeValid validCells) $
           getEdge <$> [ minBound .. maxBound ] <*> cells
 
